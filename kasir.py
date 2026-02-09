@@ -1,3 +1,4 @@
+#running: streamlit run "c:/Users/field/Downloads/Compressed/kasir otomatis/kasir.py"
 import streamlit as st
 try:
     import pandas as pd
@@ -12,9 +13,9 @@ import os
 # ========================
 # KONFIGURASI FILE
 # ========================
-MASTER_FILE    = "master_barang.xlsx"
+MASTER_FILE = "master_barang.xlsx"
 TRANSAKSI_FILE = "transaksi.xlsx"
-USER_FILE      = "user_kasir.xlsx"
+USER_FILE = "user_kasir.xlsx"
 
 # ========================
 # PAGE CONFIG
@@ -93,7 +94,7 @@ if os.path.exists(TRANSAKSI_FILE):
 # ========================
 # TABS
 # ========================
-tab1, tab2, tab3 = st.tabs(["📝 Input Transaksi", "📊 Data Transaksi", "📈 Dashboard"])
+tab1, tab2, tab3, tab4 = st.tabs(["📝 Input Transaksi", "📊 Data Transaksi", "🛠️ Manajemen Stok", "📈 Dashboard"])
 
 with tab1:
     st.subheader("➕ Transaksi Baru")
@@ -272,7 +273,8 @@ with tab1:
 
 with tab2:
     st.subheader("📊 Data Transaksi")
-    
+
+    # Reload transaksi display after inventory forms
     if os.path.exists(TRANSAKSI_FILE):
         df_transaksi = pd.read_excel(TRANSAKSI_FILE)
         
@@ -352,6 +354,112 @@ with tab2:
         st.info("File transaksi belum ada")
 
 with tab3:
+    st.subheader("🛠️ Manajemen Stok & Produk")
+    master_inv = pd.read_excel(MASTER_FILE)
+    # Pastikan kolom yang dibutuhkan ada
+    if "kode" not in master_inv.columns:
+        master_inv["kode"] = ""
+    if "modal" not in master_inv.columns:
+        master_inv["modal"] = 0.0
+
+    # Helper: parsing angka dari teks (mendukung koma sebagai desimal)
+    def _parse_number(s):
+        try:
+            if s is None:
+                return None
+            ss = str(s).strip()
+            if ss == "":
+                return None
+            return float(ss.replace(",", "."))
+        except Exception:
+            return None
+
+    # Form: Tambah Stok untuk produk existing
+    with st.form("form_tambah_stok"):
+        pilih_barang = st.selectbox("Pilih Barang untuk Tambah Stok", master_inv["nama_barang"], key="pilih_barang_tambah")
+        tambah_qty = st.text_input("Jumlah yang ditambahkan (support desimal)", value="", placeholder="Contoh: 10", key="tambah_qty")
+        submit_tambah = st.form_submit_button("➕ Tambah Stok")
+
+    if submit_tambah:
+        tambah_qty_val = _parse_number(tambah_qty)
+        if tambah_qty_val is None or tambah_qty_val <= 0:
+            st.warning("Masukkan jumlah yang valid (lebih dari 0)")
+        else:
+            master_inv = pd.read_excel(MASTER_FILE)
+            idx = master_inv[master_inv["nama_barang"] == pilih_barang].index
+            if len(idx) == 0:
+                st.error("Barang tidak ditemukan di master. Gunakan form Tambah Produk jika belum ada.")
+            else:
+                master_inv.loc[idx, "stok"] = master_inv.loc[idx, "stok"] + tambah_qty_val
+                master_inv.to_excel(MASTER_FILE, index=False)
+                st.success(f"✅ Stok untuk {pilih_barang} berhasil ditambahkan sebanyak {tambah_qty_val}")
+                st.rerun()
+
+    st.divider()
+
+    # Form: Tambah Produk Baru
+    with st.form("form_tambah_produk"):
+        st.write("**Tambah Produk Baru**")
+        nama_baru = st.text_input("Nama Barang Baru", key="nama_baru")
+        satuan_baru = st.text_input("Satuan", value="pcs", key="satuan_baru")
+        harga_baru = st.text_input("Harga Jual per Satuan", value="", placeholder="Contoh: 10000", key="harga_baru")
+        modal_baru = st.text_input("Harga Modal per Satuan", value="", placeholder="Contoh: 7000", key="modal_baru")
+        stok_awal = st.text_input("Stok Awal", value="", placeholder="Contoh: 10", key="stok_awal")
+        submit_produk = st.form_submit_button("🆕 Tambah Produk")
+
+    if submit_produk:
+        nama_strip = str(nama_baru).strip()
+        if nama_strip == "":
+            st.warning("Masukkan nama produk")
+        else:
+            # parsing angka dari input teks
+            harga_val = _parse_number(harga_baru)
+            modal_val = _parse_number(modal_baru) or 0.0
+            stok_val = _parse_number(stok_awal) or 0.0
+
+            if harga_val is None:
+                st.warning("Masukkan harga jual yang valid")
+            else:
+                master_inv = pd.read_excel(MASTER_FILE)
+                # Cek duplikasi nama
+                if nama_strip in master_inv["nama_barang"].values:
+                    st.error("Produk dengan nama ini sudah ada di master. Gunakan form Tambah Stok.")
+                else:
+                    # generate kode otomatis
+                    import re
+                    existing_codes = master_inv[master_inv["kode"].notna() & (master_inv["kode"] != "")]["kode"].astype(str).tolist()
+                    nums = []
+                    for c in existing_codes:
+                        m = re.search(r"(\d+)$", c)
+                        if m:
+                            try:
+                                nums.append(int(m.group(1)))
+                            except:
+                                pass
+                    next_n = max(nums) + 1 if nums else 1
+                    kode_baru = f"P{next_n:04d}"
+
+                    new_row = {
+                        "kode": kode_baru,
+                        "nama_barang": nama_strip,
+                        "satuan": satuan_baru if satuan_baru else "pcs",
+                        "harga": float(harga_val),
+                        "modal": float(modal_val),
+                        "stok": float(stok_val)
+                    }
+                    # Pastikan kolom exist in master_inv, append missing keys with defaults
+                    for k in new_row.keys():
+                        if k not in master_inv.columns:
+                            master_inv[k] = 0 if k in ["harga", "modal", "stok"] else ""
+
+                    master_inv = pd.concat([master_inv, pd.DataFrame([new_row])], ignore_index=True)
+                    master_inv.to_excel(MASTER_FILE, index=False)
+                    st.success(f"✅ Produk '{nama_strip}' berhasil ditambahkan dengan kode {kode_baru}")
+                    st.experimental_rerun()
+
+    st.markdown("---")
+
+with tab4:
     st.subheader("📈 Dashboard Penjualan")
     
     if os.path.exists(TRANSAKSI_FILE):
@@ -372,65 +480,86 @@ with tab3:
             # Filter data berdasarkan range tanggal
             df_filtered_dash = df_dash[(df_dash["tanggal"] >= start_date) & (df_dash["tanggal"] <= end_date)]
             
-            # KPI Cards
+            # Hitung modal & keuntungan (profit)
+            # Ambil modal dari master data (cari nama kolom yang umum)
+            master_for_modal = pd.read_excel(MASTER_FILE)
+            modal_col = None
+            for c in ["modal", "Modal", "harga_modal", "harga_beli", "cost"]:
+                if c in master_for_modal.columns:
+                    modal_col = c
+                    break
+            if modal_col is None:
+                # jika tidak ada kolom modal, default 0
+                master_for_modal["modal"] = 0.0
+                modal_col = "modal"
+
+            modal_map = master_for_modal.set_index("nama_barang")[modal_col].to_dict()
+            df_filtered_dash["modal_unit"] = df_filtered_dash["nama_barang"].map(modal_map).fillna(0).astype(float)
+            df_filtered_dash["profit"] = df_filtered_dash["total_harga"] - (df_filtered_dash["modal_unit"] * df_filtered_dash["jumlah"])
+
+            # KPI Cards (termasuk keuntungan)
             st.divider()
-            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-            
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
+
             with kpi_col1:
                 st.metric(
                     "💰 Total Penjualan",
                     f"Rp {df_filtered_dash['total_harga'].sum():,.0f}"
                 )
-            
+
             with kpi_col2:
                 st.metric(
                     "🧾 Total Transaksi",
                     len(df_filtered_dash)
                 )
-            
+
             with kpi_col3:
                 st.metric(
                     "📦 Total Unit Terjual",
                     int(df_filtered_dash['jumlah'].sum())
                 )
-            
+
             with kpi_col4:
+                st.metric(
+                    "📈 Total Keuntungan",
+                    f"Rp {df_filtered_dash['profit'].sum():,.0f}"
+                )
+
+            with kpi_col5:
                 if len(df_filtered_dash) > 0:
                     avg_transaksi = df_filtered_dash['total_harga'].sum() / len(df_filtered_dash)
                     st.metric(
                         "📊 Rata-rata Transaksi",
                         f"Rp {avg_transaksi:,.0f}"
                     )
-            
-            # Chart 1: Tren Penjualan dengan pilihan periode
+
+            # Chart 1: Tren Jumlah Terjual (pilihan periode)
             st.subheader("📅 Tren Jumlah Terjual")
-            
-            # Pilih periode tampilan
             periode = st.radio(
                 "Pilih Periode Tampilan:",
                 ["Harian", "Mingguan", "Bulanan"],
                 horizontal=True
             )
-            
-            # Persiapkan data berdasarkan periode
+
+            # Persiapkan data berdasarkan periode untuk jumlah
             df_chart = df_filtered_dash.copy()
-            
+
             if periode == "Harian":
                 chart_data = df_chart.groupby("tanggal")["jumlah"].sum().reset_index()
                 chart_data.columns = ["tanggal", "jumlah_terjual"]
                 chart_data = chart_data.sort_values("tanggal")
                 x_label = "Tanggal"
                 title = "Jumlah Terjual (Harian)"
-                
+
             elif periode == "Mingguan":
                 df_chart["minggu"] = df_chart["tanggal_waktu"].dt.isocalendar().week
                 df_chart["tahun"] = df_chart["tanggal_waktu"].dt.year
                 chart_data = df_chart.groupby(["tahun", "minggu"])["jumlah"].sum().reset_index()
-                chart_data["minggu_tahun"] = "Minggu " + chart_data["minggu"].astype(str) + " (" + chart_data["tahun"].astype(str) + ")"
+                chart_data["periode_label"] = "Minggu " + chart_data["minggu"].astype(str) + " (" + chart_data["tahun"].astype(str) + ")"
                 chart_data.columns = ["tahun", "minggu", "jumlah_terjual", "periode_label"]
                 x_label = "Minggu"
                 title = "Jumlah Terjual (Mingguan)"
-                
+
             else:  # Bulanan
                 df_chart["bulan_tahun"] = df_chart["tanggal_waktu"].dt.to_period("M")
                 chart_data = df_chart.groupby("bulan_tahun")["jumlah"].sum().reset_index()
@@ -438,7 +567,7 @@ with tab3:
                 chart_data.columns = ["bulan_tahun", "jumlah_terjual", "bulan_label"]
                 x_label = "Bulan"
                 title = "Jumlah Terjual (Bulanan)"
-            
+
             if not chart_data.empty:
                 if periode == "Harian":
                     fig_daily = px.line(
@@ -465,10 +594,29 @@ with tab3:
                         title=title,
                         labels={"bulan_label": x_label, "jumlah_terjual": "Jumlah Terjual (unit)"}
                     )
-                
+
                 fig_daily.update_layout(height=400)
                 fig_daily.update_yaxes(title_text="Jumlah Terjual (unit)")
                 st.plotly_chart(fig_daily, use_container_width=True)
+
+            # Chart Profit: Tren Keuntungan sesuai periode
+            st.subheader("💹 Tren Keuntungan")
+            df_profit_chart = df_filtered_dash.copy()
+            if periode == "Harian":
+                profit_by_date = df_profit_chart.groupby("tanggal")["profit"].sum().reset_index()
+                fig_profit = px.line(profit_by_date, x="tanggal", y="profit", title="Keuntungan Per Hari", markers=True,
+                                     labels={"tanggal": "Tanggal", "profit": "Keuntungan (Rp)"})
+            elif periode == "Mingguan":
+                profit_by_week = df_profit_chart.groupby([df_profit_chart["tanggal_waktu"].dt.isocalendar().year, df_profit_chart["tanggal_waktu"].dt.isocalendar().week])["profit"].sum().reset_index()
+                profit_by_week["label"] = profit_by_week["week"].astype(str) + " (" + profit_by_week["year"].astype(str) + ")"
+                fig_profit = px.bar(profit_by_week, x="label", y="profit", title="Keuntungan Per Minggu", labels={"label": "Minggu", "profit": "Keuntungan (Rp)"})
+            else:
+                profit_by_month = df_profit_chart.groupby(df_profit_chart["tanggal_waktu"].dt.to_period("M"))["profit"].sum().reset_index()
+                profit_by_month["label"] = profit_by_month["tanggal_waktu"].astype(str)
+                fig_profit = px.bar(profit_by_month, x="label", y="profit", title="Keuntungan Per Bulan", labels={"label": "Bulan", "profit": "Keuntungan (Rp)"})
+
+            fig_profit.update_layout(height=350)
+            st.plotly_chart(fig_profit, use_container_width=True)
             
             # Chart 2: Penjualan per Barang
             st.subheader("🏆 Penjualan Per Barang")
