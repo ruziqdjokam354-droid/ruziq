@@ -495,7 +495,10 @@ with tab4:
 
             modal_map = master_for_modal.set_index("nama_barang")[modal_col].to_dict()
             df_filtered_dash["modal_unit"] = df_filtered_dash["nama_barang"].map(modal_map).fillna(0).astype(float)
-            df_filtered_dash["profit"] = df_filtered_dash["total_harga"] - (df_filtered_dash["modal_unit"] * df_filtered_dash["jumlah"])
+            # Profit per unit = harga - modal_unit; total profit = profit_unit * jumlah
+            df_filtered_dash["harga"] = df_filtered_dash["harga"].astype(float)
+            df_filtered_dash["profit_unit"] = df_filtered_dash["harga"] - df_filtered_dash["modal_unit"]
+            df_filtered_dash["profit"] = df_filtered_dash["profit_unit"] * df_filtered_dash["jumlah"]
 
             # KPI Cards (termasuk keuntungan)
             st.divider()
