@@ -12,9 +12,9 @@ import os
 # ========================
 # KONFIGURASI FILE
 # ========================
-MASTER_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\master_barang.xlsx"
-TRANSAKSI_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\transaksi.xlsx"
-USER_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\user_kasir.xlsx"
+MASTER_FILE    = "master_barang.xlsx"
+TRANSAKSI_FILE = "transaksi.xlsx"
+USER_FILE      = "user_kasir.xlsx"
 
 # ========================
 # PAGE CONFIG
