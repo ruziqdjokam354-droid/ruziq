@@ -1,20 +1,30 @@
 import streamlit as st
+import os
+from datetime import datetime, timedelta
+
+# ========================
+# IMPORT DEPENDENCY
+# ========================
 try:
     import pandas as pd
     import plotly.express as px
     import plotly.graph_objects as go
-except Exception as e:
-    st.error("Missing dependency: pandas or plotly or one of its dependencies.\nPlease run: `pip install -r requirements.txt`")
+except Exception:
+    st.error(
+        "Missing dependency: pandas / plotly.\n"
+        "Pastikan requirements.txt berisi:\n"
+        "streamlit\npandas\nplotly\nopenpyxl"
+    )
     raise
-from datetime import datetime, timedelta
-import os
 
 # ========================
-# KONFIGURASI FILE
+# KONFIGURASI FILE (CLOUD SAFE)
 # ========================
-MASTER_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\master_barang.xlsx"
-TRANSAKSI_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\transaksi.xlsx"
-USER_FILE = r"C:\Users\field\Downloads\Compressed\kasir otomatis\user_kasir.xlsx"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MASTER_FILE    = os.path.join(BASE_DIR, "master_barang.xlsx")
+TRANSAKSI_FILE = os.path.join(BASE_DIR, "transaksi.xlsx")
+USER_FILE      = os.path.join(BASE_DIR, "user_kasir.xlsx")
 
 # ========================
 # PAGE CONFIG
