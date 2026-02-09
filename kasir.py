@@ -1,6 +1,17 @@
 import streamlit as st
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
+
+# ========================
+# PAGE CONFIG (WAJIB PALING ATAS)
+# ========================
+st.set_page_config(
+    page_title="TOKO BANGUNAN ZUHRI",
+    page_icon="🧾",
+    layout="centered"
+)
+
+st.title("🧾 TOKO BANGUNAN ZUHRI")
 
 # ========================
 # IMPORT DEPENDENCY
@@ -11,11 +22,11 @@ try:
     import plotly.graph_objects as go
 except Exception:
     st.error(
-        "Missing dependency: pandas / plotly.\n"
-        "Pastikan requirements.txt berisi:\n"
+        "❌ Missing dependency\n\n"
+        "requirements.txt wajib berisi:\n"
         "streamlit\npandas\nplotly\nopenpyxl"
     )
-    raise
+    st.stop()
 
 # ========================
 # KONFIGURASI FILE (CLOUD SAFE)
@@ -25,6 +36,36 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MASTER_FILE    = os.path.join(BASE_DIR, "master_barang.xlsx")
 TRANSAKSI_FILE = os.path.join(BASE_DIR, "transaksi.xlsx")
 USER_FILE      = os.path.join(BASE_DIR, "user_kasir.xlsx")
+
+# ========================
+# LOAD DATA
+# ========================
+@st.cache_data
+def load_excel(path):
+    return pd.read_excel(path)
+
+try:
+    df_master = load_excel(MASTER_FILE)
+    df_transaksi = load_excel(TRANSAKSI_FILE)
+    df_user = load_excel(USER_FILE)
+except FileNotFoundError as e:
+    st.error(f"❌ File tidak ditemukan: {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"❌ Gagal membaca file: {e}")
+    st.stop()
+
+# ========================
+# CEK DATA (PREVIEW)
+# ========================
+st.subheader("📦 Master Barang")
+st.dataframe(df_master, use_container_width=True)
+
+st.subheader("🧾 Data Transaksi")
+st.dataframe(df_transaksi, use_container_width=True)
+
+st.subheader("👤 User Kasir")
+st.dataframe(df_user, use_container_width=True)
 
 # ========================
 # PAGE CONFIG
